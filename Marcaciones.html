@@ -243,77 +243,75 @@
         }
 
         function registerClock(clockType) {
-            const loggedInDNI = localStorage.getItem('loggedInDNI');
-            const workerName = userNames[loggedInDNI];
+    const loggedInDNI = localStorage.getItem('loggedInDNI');
+    const workerName = userNames[loggedInDNI];
 
-            if (!workerName) {
-                alert('No se ha detectado ningún usuario autenticado.');
-                return;
-            }
+    if (!workerName) {
+        alert('No se ha detectado ningún usuario autenticado.');
+        return;
+    }
 
-            const now = new Date();
-            const clockInTime = now.toLocaleTimeString();
-            const currentDate = now.toLocaleDateString();
+    const now = new Date();
+    const clockInTime = now.toLocaleTimeString();
+    const currentDate = now.toLocaleDateString();
 
-            const row = isMarcationExists(currentDate);
+    const row = isMarcationExists(currentDate);
 
-            if (!row) {
-                const table = document.getElementById('clockTable').getElementsByTagName('tbody')[0];
-                const newRow = table.insertRow();
-                newRow.insertCell(0).textContent = currentDate;
-                
-                for (let i = 1; i <= 4; i++) {
-                    newRow.insertCell(i).textContent = '';
-                }
-                row = newRow;
-            }
-
-            const workerMarcaciones = checkPreviousMarcations(workerName, currentDate);
-            
-            if (!canRegisterClock(clockType, workerMarcaciones)) {
-                document.getElementById('warningMessage').textContent = `Debes registrar la marcación anterior antes de registrar "${clockType}".`;
-                return;
-            }
-
-            if (clockType === 'Salida' && workerMarcaciones['Salida']) {
-                document.getElementById('warningMessage').textContent = `Ya se ha registrado una marcación de "Salida" para ${workerName} en el día de hoy.`;
-                return;
-            }
-
-            workerMarcaciones[clockType] = clockInTime;
-            const clockIndex = ['Ingreso', 'Inicio Break', 'Retorno Break', 'Salida'].indexOf(clockType) + 1;
-            row.cells[clockIndex].textContent = clockInTime;
-
-            if (clockType === 'Salida') {
-                document.querySelectorAll('.button-container button').forEach(button => button.disabled = true);
-            }
-
-            document.getElementById('warningMessage').textContent = '';
-
-            // Enviar datos al servidor
-            fetch('https://mi-backend.com/marcaciones/save_marcacion.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: new URLSearchParams({
-                    'dni': loggedInDNI,
-                    'marcacionTipo': clockType,
-                    'hora': clockInTime,
-                    'fecha': currentDate
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'error') {
-                    document.getElementById('warningMessage').textContent = `Error: ${data.message}`;
-                }
-            })
-            .catch(error => {
-                document.getElementById('warningMessage').textContent = `Error al conectar con el servidor: ${error.message}`;
-            });
+    if (!row) {
+        // Crear una nueva fila si no existe para la fecha actual
+        const table = document.getElementById('clockTable').getElementsByTagName('tbody')[0];
+        const newRow = table.insertRow();
+        newRow.insertCell(0).textContent = currentDate;
+        
+        // Inicializar celdas de marcaciones vacías
+        for (let i = 1; i <= 4; i++) {
+            newRow.insertCell(i).textContent = '';
         }
+        row = newRow;
+    }
 
+    const workerMarcaciones = checkPreviousMarcations(workerName, currentDate);
+    
+    // Verificar si se puede registrar la marcación
+    if (!canRegisterClock(clockType, workerMarcaciones)) {
+        document.getElementById('warningMessage').textContent = `Debes registrar la marcación anterior antes de registrar "${clockType}".`;
+        return;
+    }
+
+    if (clockType === 'Salida' && workerMarcaciones['Salida']) {
+        document.getElementById('warningMessage').textContent = `Ya se ha registrado una marcación de "Salida" para ${workerName} en el día de hoy.`;
+        return;
+    }
+
+    // Registrar la marcación
+    workerMarcaciones[clockType] = clockInTime;
+    const clockIndex = ['Ingreso', 'Inicio Break', 'Retorno Break', 'Salida'].indexOf(clockType) + 1;
+    row.cells[clockIndex].textContent = clockInTime;
+
+    // Deshabilitar botones si es "Salida", excepto el de "Cerrar Sesión"
+    if (clockType === 'Salida') {
+        document.querySelectorAll('.button-container button').forEach(button => button.disabled = true);
+    }
+
+    document.getElementById('warningMessage').textContent = '';
+
+    // Enviar la marcación al servidor
+    fetch('https://mi-backend.com/marcaciones/save_marcacion.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            dni: loggedInDNI,
+            fecha: currentDate,
+            tipo_marcacion: clockType,
+            hora: clockInTime
+        })
+    })
+    .then(response => response.json())
+    .then(data => console.log('Datos enviados al servidor:', data))
+    .catch(error => console.error('Error al conectar con el servidor:', error));
+}
         function logout() {
             localStorage.removeItem('loggedInDNI');
             localStorage.removeItem('sessionActive');
