@@ -229,19 +229,17 @@
             const lastMarcationType = Object.keys(workerMarcaciones).pop();
             const lastMarcationIndex = validMarcationOrder.indexOf(lastMarcationType);
 
-            // Asegurarse de que "Ingreso" sea la primera marcación
             if (Object.keys(workerMarcaciones).length === 0 && clockType !== 'Ingreso') {
                 return false;
             }
 
-            // Verificar secuencia correcta de marcaciones
             if (currentIndex === 0) {
-                return lastMarcationIndex === -1; // "Ingreso" debe ser la primera marcación
+                return lastMarcationIndex === -1;
             }
             if (clockType === 'Salida') {
-                return !workerMarcaciones['Salida']; // Solo se puede marcar "Salida" una vez
+                return !workerMarcaciones['Salida'];
             }
-            return currentIndex === lastMarcationIndex + 1; // Asegurarse de que se sigue el orden correcto
+            return currentIndex === lastMarcationIndex + 1;
         }
 
         function registerClock(clockType) {
@@ -260,12 +258,10 @@
             const row = isMarcationExists(currentDate);
 
             if (!row) {
-                // Crear una nueva fila si no existe para la fecha actual
                 const table = document.getElementById('clockTable').getElementsByTagName('tbody')[0];
                 const newRow = table.insertRow();
                 newRow.insertCell(0).textContent = currentDate;
                 
-                // Inicializar celdas de marcaciones vacías
                 for (let i = 1; i <= 4; i++) {
                     newRow.insertCell(i).textContent = '';
                 }
@@ -274,7 +270,6 @@
 
             const workerMarcaciones = checkPreviousMarcations(workerName, currentDate);
             
-            // Verificar si se puede registrar la marcación
             if (!canRegisterClock(clockType, workerMarcaciones)) {
                 document.getElementById('warningMessage').textContent = `Debes registrar la marcación anterior antes de registrar "${clockType}".`;
                 return;
@@ -285,17 +280,38 @@
                 return;
             }
 
-            // Registrar la marcación
             workerMarcaciones[clockType] = clockInTime;
             const clockIndex = ['Ingreso', 'Inicio Break', 'Retorno Break', 'Salida'].indexOf(clockType) + 1;
             row.cells[clockIndex].textContent = clockInTime;
 
-            // Deshabilitar botones si es "Salida", excepto el de "Cerrar Sesión"
             if (clockType === 'Salida') {
                 document.querySelectorAll('.button-container button').forEach(button => button.disabled = true);
             }
 
             document.getElementById('warningMessage').textContent = '';
+
+            // Enviar datos al servidor
+            fetch('http://localhost/marcaciones/save_marcacion.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: new URLSearchParams({
+                    'dni': loggedInDNI,
+                    'marcacionTipo': clockType,
+                    'hora': clockInTime,
+                    'fecha': currentDate
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'error') {
+                    document.getElementById('warningMessage').textContent = `Error: ${data.message}`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('warningMessage').textContent = `Error al conectar con el servidor: ${error.message}`;
+            });
         }
 
         function logout() {
@@ -308,25 +324,22 @@
             const table = document.getElementById('clockTable');
             let csvContent = "data:text/csv;charset=utf-8,";
 
-            // Agregar los encabezados de la tabla
             const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent);
             csvContent += headers.join(",") + "\n";
 
-            // Agregar los datos de la tabla
             const rows = Array.from(table.querySelectorAll('tbody tr'));
             rows.forEach(row => {
                 const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent);
                 csvContent += cells.join(",") + "\n";
             });
 
-            // Crear el enlace para descargar el archivo CSV
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement('a');
             link.setAttribute('href', encodedUri);
             link.setAttribute('download', 'marcaciones.csv');
-            document.body.appendChild(link); // Necesario para Firefox
+            document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link); // Limpieza
+            document.body.removeChild(link);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
